@@ -1,0 +1,75 @@
+################################################################
+#  Automation Person_1
+################################################################
+
+- alias: 'Boolean Empreinte Person_1 toggle'
+  initial_state: True
+  mode: single
+  trigger:
+    - platform: state
+      entity_id: sensor.person_detected
+      from: 'unknown'
+      to: 'person_1_detected'
+  condition:
+    - condition: state
+      entity_id: input_boolean.identification_par_badge
+      state: 'on'
+  action:
+    - service: input_boolean.toggle
+      entity_id: input_boolean.presence_person_1
+
+- alias: 'Light from ON to OFF'
+  initial_state: True
+  trigger:
+    - platform: state
+      entity_id: input_boolean.presence_person_1
+      from: 'off'
+      to: 'on'
+  action:
+    - service: script.turn_on
+      entity_id: script.presence_person_1
+
+- alias: 'Light from OFF to ON'
+  initial_state: True
+  trigger:
+    - platform: state
+      entity_id: input_boolean.presence_person_1
+      from: 'on'
+      to: 'off'
+  action:
+    - service: script.turn_on
+      entity_id: script.absence_person_1
+
+
+################################################################
+#  Script Person_1
+################################################################
+
+# Gestion des Leds Vertes ou Rouges sur Nodemcu
+  presence_person_1:
+    sequence:
+      - service: light.turn_on
+        data:
+          brightness_pct: 50
+          transition: 0
+        target:
+          entity_id: light.led_presence_person_1
+      - service: light.turn_off
+        data:
+          transition: 0
+        target:
+          entity_id: light.led_absence_person_1
+
+  absence_person_1:
+    sequence:
+      - service: light.turn_on
+        data:
+          brightness_pct: 40
+          transition: 0
+        target:
+          entity_id: light.led_absence_person_1
+      - service: light.turn_off
+        data:
+          transition: 0
+        target:
+          entity_id: light.led_presence_person_1
