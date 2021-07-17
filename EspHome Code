@@ -1,0 +1,202 @@
+esphome:
+  name: "module_presence_jarvis"
+  platform: ESP8266
+  board: d1_mini
+
+# Insert your SSID and Your PWD after inital setup
+wifi:
+  networks:
+    - ssid: your_ssid  # Uncomment this line (remove # at beginning of line) and enter your details in secrets.yaml file!
+      password: your_code  # Uncomment this line (remove # at beginning of line) and enter your details in secrets.yaml file!
+
+  manual_ip:
+    static_ip: 192.168.1.95
+    gateway: 192.168.1.1
+    subnet: 255.255.255.0
+
+api:
+  password: "your_pwd"
+
+ota:
+  password: "your_pwd"
+
+uart:
+  rx_pin: D4 #Yellow
+  tx_pin: D3 #Brown
+  baud_rate: 57600
+
+binary_sensor:
+  - platform: status
+    name: "Module Presence Status"
+
+i2c:
+  sda: D2
+  scl: D1
+
+pn532_i2c:
+  update_interval: 0.3s
+  on_tag:
+    then:
+      - text_sensor.template.publish:
+          id: badge_recognized
+          state: !lambda 'return x;'
+      - if:
+          condition:
+            text_sensor.state:
+              id: badge_recognized
+              state: 'Your-Badge-Code-1'
+          then:
+            - script.execute: person_1_detected
+      - if:
+          condition:
+            text_sensor.state:
+              id: badge_recognized
+              state: 'Your-Badge-Code-2'
+          then:
+            - script.execute: person_2_detected
+      - if:
+          condition:
+            text_sensor.state:
+              id: badge_recognized
+              state: 'Your-Badge-Code-3'
+          then:
+            - script.execute: guest_detected
+#      - homeassistant.tag_scanned: !lambda 'return x;'
+
+text_sensor:
+  - platform: template
+    id: badge_recognized
+    internal: true
+    name: "Badge Recognized"
+  - platform: template
+    id: person_detected
+    name: "Person Detected"
+
+# Declare Grow Fingerprint Reader
+fingerprint_grow:
+#  sensing_pin: TX
+  on_finger_scan_matched:
+    - if:
+        condition:
+          - lambda: 'return finger_id > 0;'
+          - lambda: 'return finger_id < 9;'
+        then:
+          - script.execute: person_1_detected
+    - if:
+        condition:
+          - lambda: 'return finger_id > 10;'
+          - lambda: 'return finger_id < 19;'
+        then:
+          - script.execute: person_1_detected
+
+    - if:
+        condition:
+          - lambda: 'return finger_id > 30;'
+          - lambda: 'return finger_id < 39;'
+        then:
+          - script.execute: person_2_detected
+
+    - if:
+        condition:
+          - lambda: 'return finger_id > 40;'
+          - lambda: 'return finger_id < 50;'
+        then:
+          - script.execute: person_2_detected
+
+  on_finger_scan_unmatched:
+    - fingerprint_grow.aura_led_control:
+        state: BREATHING
+        speed: 80
+        color: RED
+        count: 1
+
+output:
+  - platform: esp8266_pwm
+    id: LED_Guest
+    pin: D0
+
+  - platform: esp8266_pwm
+    pin: D5
+    id: LED_Presence_Person_1
+
+  - platform: esp8266_pwm
+    id: LED_Absence_Person_1
+    pin: D6
+
+  - platform: esp8266_pwm
+    id: LED_Presence_Person_2
+    pin: D7
+
+  - platform: esp8266_pwm
+    id: LED_Absence_Person_2
+    pin: D8
+
+light:
+  - platform: monochromatic
+    output: LED_Guest
+    name: "LED_Guest"
+
+  - platform: monochromatic
+    output: LED_Presence_Person_1
+    name: "LED_Presence_Person_1"
+
+  - platform: monochromatic
+    output: LED_Absence_Person_1
+    name: "LED_Absence_Person_1"
+
+  - platform: monochromatic
+    output: LED_Presence_Person_2
+    name: "LED_Presence_Person_2"
+
+  - platform: monochromatic
+    output: LED_Absence_Person_2
+    name: "LED_Absence_Person_2"
+
+script:
+  - id: person_1_detected
+    mode: single
+    then:
+      - fingerprint_grow.aura_led_control:
+          state: BREATHING
+          speed: 80
+          color: BLUE
+          count: 1
+      - text_sensor.template.publish:
+          id: person_detected
+          state: !lambda 'return "person_1_detected";'
+      - delay: 400ms
+      - text_sensor.template.publish:
+          id: person_detected
+          state: !lambda 'return "unknown";'
+
+  - id: person_2_detected
+    mode: single
+    then:
+      - fingerprint_grow.aura_led_control:
+          state: BREATHING
+          speed: 80
+          color: PURPLE
+          count: 1
+      - text_sensor.template.publish:
+          id: person_detected
+          state: !lambda 'return "person_2_detected";'
+      - delay: 400ms
+      - text_sensor.template.publish:
+          id: person_detected
+          state: !lambda 'return "unknown";'
+
+  - id: guest_detected
+    mode: single
+    then:
+      - fingerprint_grow.aura_led_control:
+          state: BREATHING
+          speed: 80
+          color: PURPLE
+          count: 1
+      - text_sensor.template.publish:
+          id: person_detected
+          state: !lambda 'return "guest_detected";'
+      - delay: 400ms
+      - text_sensor.template.publish:
+          id: person_detected
+          state: !lambda 'return "unknown";'
